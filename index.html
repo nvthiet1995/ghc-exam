@@ -1,0 +1,2385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>GH-300 Practice 01 – Interactive Quiz</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    margin: 0; padding: 1.5rem 1rem 3rem;
+    background: #f0fdf4;
+    color: #111;
+  }
+  .container { max-width: 860px; margin: 0 auto; }
+  h1 { color: #03787c; margin-bottom: .25rem; }
+  .subtitle { color: #444; margin-bottom: 1.5rem; font-size: .95rem; }
+
+  /* Score board */
+  #scoreboard {
+    background: #fff;
+    border: 1px solid #d1fae5;
+    border-radius: 14px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(3,120,124,.08);
+    flex-wrap: wrap;
+  }
+  #scoreboard .score-item { text-align: center; }
+  #scoreboard .score-val { font-size: 2rem; font-weight: 700; }
+  #scoreboard .score-lbl { font-size: .8rem; color: #666; text-transform: uppercase; letter-spacing: .04em; }
+  .score-correct .score-val { color: #059669; }
+  .score-wrong .score-val { color: #dc2626; }
+  .score-skip .score-val { color: #d97706; }
+  .score-total .score-val { color: #03787c; }
+  #progress-bar-wrap { flex: 1; min-width: 200px; }
+  #progress-bar { height: 10px; background: #d1fae5; border-radius: 99px; overflow: hidden; margin-bottom: 4px; }
+  #progress-fill { height: 100%; width: 0%; background: #10b981; transition: width .3s; border-radius: 99px; }
+  #progress-text { font-size: .8rem; color: #555; }
+
+  /* Filters */
+  .filter-bar { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+  .filter-btn { background:#e0f2f1; color:#03787c; border:1px solid #99f6e4; border-radius:8px; padding:.3rem .75rem; cursor:pointer; font-size:.85rem; font-weight:600; }
+  .filter-btn.active { background:#03787c; color:#fff; border-color:#03787c; }
+  .filter-btn:hover { background:#0d9488; color:#fff; }
+
+  /* Question card */
+  .q {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 1.25rem 1.4rem 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    transition: border-color .2s;
+  }
+  .q.answered-correct { border-color: #34d399; }
+  .q.answered-wrong { border-color: #f87171; }
+  .q.answered-partial { border-color: #fb923c; }
+  .q.hidden { display: none; }
+
+  .q-header { display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+  .q-num { font-weight: 700; color: #03787c; font-size: 1rem; }
+  .badge { font-size: .7rem; padding: .15rem .5rem; border-radius: 6px; font-weight: 600; }
+  .badge-single { background: #dbeafe; color: #1d4ed8; }
+  .badge-multi { background: #fef9c3; color: #92400e; }
+
+  .q-title { margin: 0 0 .9rem 0; font-size: 1rem; font-weight: 600; line-height: 1.5; }
+
+  .choices { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .85rem; }
+  .opt {
+    display: flex; align-items: flex-start; gap: .6rem;
+    padding: .5rem .75rem;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: background .15s;
+    font-size: .95rem;
+    line-height: 1.45;
+    user-select: none;
+  }
+  .opt:hover { background: #f0fdf4; border-color: #6ee7b7; }
+  .opt input { margin-top: 3px; flex-shrink: 0; accent-color: #03787c; }
+  .opt.correct { background: #ecfdf5; border-color: #34d399; }
+  .opt.wrong { background: #fef2f2; border-color: #f87171; }
+  .opt.missed { background: #fff7ed; border-color: #fb923c; }
+
+  .q-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+  .btn-check {
+    background: #03787c; color: #fff; border: none;
+    border-radius: 8px; padding: .4rem .9rem;
+    cursor: pointer; font-weight: 700; font-size: .9rem;
+  }
+  .btn-check:hover { background: #014446; }
+  .btn-reveal {
+    background: #e5e7eb; color: #374151; border: none;
+    border-radius: 8px; padding: .4rem .9rem;
+    cursor: pointer; font-weight: 600; font-size: .9rem;
+  }
+  .btn-reveal:hover { background: #d1d5db; }
+  .btn-reset {
+    background: #fff; color: #6b7280; border: 1px solid #d1d5db;
+    border-radius: 8px; padding: .4rem .9rem;
+    cursor: pointer; font-weight: 600; font-size: .9rem;
+  }
+  .btn-reset:hover { background: #f9fafb; }
+
+  .q-result { font-size: .95rem; font-weight: 700; min-height: 1.4em; }
+  .q-result.ok { color: #065f46; }
+  .q-result.bad { color: #7f1d1d; }
+  .q-result.info { color: #374151; font-weight: 400; }
+
+  /* Correct answer reveal */
+  .answer-reveal { display:none; background:#f0fdf4; border:1px solid #6ee7b7; border-radius:8px; padding:.5rem .85rem; margin-top:.4rem; font-size:.9rem; color:#065f46; }
+  .answer-reveal strong { color:#03787c; }
+
+  /* Navigation */
+  .nav-bar { display:flex; justify-content:space-between; margin-top:1.5rem; flex-wrap:wrap; gap:.5rem; }
+  .nav-btn { background:#03787c; color:#fff; border:none; border-radius:8px; padding:.5rem 1.25rem; cursor:pointer; font-weight:700; }
+  .nav-btn:hover { background:#014446; }
+
+  @media(max-width:600px) {
+    body { padding: 1rem .5rem 2rem; }
+    #scoreboard { gap: 1rem; }
+    .score-val { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🚀 GH-300 Practice 01</h1>
+  <p class="subtitle">67 câu hỏi – Chọn đáp án rồi nhấn <strong>Check</strong> để xem kết quả ngay.</p>
+
+  <!-- Scoreboard -->
+  <div id="scoreboard">
+    <div class="score-item score-total">
+      <div class="score-val" id="sc-answered">0</div>
+      <div class="score-lbl">Đã trả lời</div>
+    </div>
+    <div class="score-item score-correct">
+      <div class="score-val" id="sc-correct">0</div>
+      <div class="score-lbl">Đúng</div>
+    </div>
+    <div class="score-item score-wrong">
+      <div class="score-val" id="sc-wrong">0</div>
+      <div class="score-lbl">Sai</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val" id="sc-pct" style="color:#03787c">—</div>
+      <div class="score-lbl">Tỉ lệ đúng</div>
+    </div>
+    <div id="progress-bar-wrap">
+      <div id="progress-bar"><div id="progress-fill"></div></div>
+      <div id="progress-text">0 / 67 câu đã trả lời</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterQuestions('all', this)">Tất cả (67)</button>
+    <button class="filter-btn" onclick="filterQuestions('unanswered', this)">Chưa trả lời</button>
+    <button class="filter-btn" onclick="filterQuestions('correct', this)">Đúng ✓</button>
+    <button class="filter-btn" onclick="filterQuestions('wrong', this)">Sai ✗</button>
+  </div>
+
+<div class="q" id="q1">
+  <div class="q-header">
+    <span class="q-num">Q1</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following describes role prompting?</p>
+  <div class="choices">
+        <label class="opt" id="opt-1-A">
+          <input type="radio" name="q1" value="A" />
+          <span>A. Describing in your prompt what your role is to get a better suggestion</span>
+        </label>
+        <label class="opt" id="opt-1-B">
+          <input type="radio" name="q1" value="B" />
+          <span>B. Tell GitHub Copilot in what tone of voice it should respond</span>
+        </label>
+        <label class="opt" id="opt-1-C">
+          <input type="radio" name="q1" value="C" />
+          <span>C. Prompt GitHub Copilot to explain what was the role of a suggestion</span>
+        </label>
+        <label class="opt" id="opt-1-D">
+          <input type="radio" name="q1" value="D" />
+          <span>D. Giving GitHub Copilot multiple examples of the form of the data you want to use</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(1, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(1, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(1)">Reset</button>
+  </div>
+  <div class="q-result" id="result-1"></div>
+</div>
+
+<div class="q" id="q2">
+  <div class="q-header">
+    <span class="q-num">Q2</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is the Benefit of using custom models in GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-2-A">
+          <input type="radio" name="q2" value="A" />
+          <span>A. Responses are faster to produce and appear sooner</span >
+        </label>
+        <label class="opt" id="opt-2-B">
+          <input type="radio" name="q2" value="B" />
+          <span>B. Responses use practices and patterns in your repositories</span>
+        </label>
+        <label class="opt" id="opt-2-C">
+          <input type="radio" name="q2" value="C" />
+          <span>C. Responses use the organization's LLM engine</span>
+        </label>
+        <label class="opt" id="opt-2-D">
+          <input type="radio" name="q2" value="D" />
+          <span>D. Responses are guaranteed to be correct</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(2, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(2, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(2)">Reset</button>
+  </div>
+  <div class="q-result" id="result-2"></div>
+</div>
+
+<div class="q" id="q3">
+  <div class="q-header">
+    <span class="q-num">Q3</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What practices enhance the quality of suggestions provided by GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-3-A">
+          <input type="checkbox" name="q3" value="A" />
+          <span>A. Clearly defining the problem or task</span>
+        </label>
+        <label class="opt" id="opt-3-B">
+          <input type="checkbox" name="q3" value="B" />
+          <span>B. Including personal information in the code comments</span>
+        </label>
+        <label class="opt" id="opt-3-C">
+          <input type="checkbox" name="q3" value="C" />
+          <span>C. Using meaningful variable names</span>
+        </label>
+        <label class="opt" id="opt-3-D">
+          <input type="checkbox" name="q3" value="D" />
+          <span>D. Providing examples of desired output</span>
+        </label>
+        <label class="opt" id="opt-3-E">
+          <input type="checkbox" name="q3" value="E" />
+          <span>E. Use a .gitignore file to exclude irrelevant files</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(3, ['A', 'C', 'D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(3, ['A', 'C', 'D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(3)">Reset</button>
+  </div>
+  <div class="q-result" id="result-3"></div>
+</div>
+
+<div class="q" id="q4">
+  <div class="q-header">
+    <span class="q-num">Q4</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">Which Copilot Individual features are available when using a supported extension for Visual Studio, VS Code, or JetBrains IDEs?</p>
+  <div class="choices">
+        <label class="opt" id="opt-4-A">
+          <input type="checkbox" name="q4" value="A" />
+          <span>A. Code suggestions</span>
+        </label>
+        <label class="opt" id="opt-4-B">
+          <input type="checkbox" name="q4" value="B" />
+          <span>B. Chat</span>
+        </label>
+        <label class="opt" id="opt-4-C">
+          <input type="checkbox" name="q4" value="C" />
+          <span>C. Knowledge Base</span>
+        </label>
+        <label class="opt" id="opt-4-D">
+          <input type="checkbox" name="q4" value="D" />
+          <span>D. Pull Request Diff Analysis</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(4, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(4, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(4)">Reset</button>
+  </div>
+  <div class="q-result" id="result-4"></div>
+</div>
+
+<div class="q" id="q5">
+  <div class="q-header">
+    <span class="q-num">Q5</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following best practices helps ensure GitHub Copilot generates high-quality code?</p>
+  <div class="choices">
+        <label class="opt" id="opt-5-A">
+          <input type="radio" name="q5" value="A" />
+          <span>A. Use vague function names and avoid comments </span>
+        </label>
+        <label class="opt" id="opt-5-B">
+          <input type="radio" name="q5" value="B" />
+          <span>B. Rely entirely on suggestions without reviewing them</span>
+        </label>
+        <label class="opt" id="opt-5-C">
+          <input type="radio" name="q5" value="C" />
+          <span>C. Prompt Copilot with specific goals and expected outcomes</span>
+        </label>
+        <label class="opt" id="opt-5-D">
+          <input type="radio" name="q5" value="D" />
+          <span>D. Avoid importing libraries to reduce confusion</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(5, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(5, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(5)">Reset</button>
+  </div>
+  <div class="q-result" id="result-5"></div>
+</div>
+
+<div class="q" id="q6">
+  <div class="q-header">
+    <span class="q-num">Q6</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is zero-shot prompting?</p>
+  <div class="choices">
+        <label class="opt" id="opt-6-A">
+          <input type="radio" name="q6" value="A" />
+          <span>A. Giving as little context to GitHub Copilot as possible</span>
+        </label>
+        <label class="opt" id="opt-6-B">
+          <input type="radio" name="q6" value="B" />
+          <span>B. Telling GitHub Copilot it needs to show only the correct answer</span>
+        </label>
+        <label class="opt" id="opt-6-C">
+          <input type="radio" name="q6" value="C" />
+          <span>C. Only giving GitHub Copilot a question as a prompt and no examples</span>
+        </label>
+        <label class="opt" id="opt-6-D">
+          <input type="radio" name="q6" value="D" />
+          <span>D. Giving GitHub Copilot examples of the problem you want to solve</span>
+        </label>
+        <label class="opt" id="opt-6-E">
+          <input type="radio" name="q6" value="E" />
+          <span>E. Giving GitHub Copilot examples of the algorithm and outcome you want to use</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(6, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(6, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(6)">Reset</button>
+  </div>
+  <div class="q-result" id="result-6"></div>
+</div>
+
+<div class="q" id="q7">
+  <div class="q-header">
+    <span class="q-num">Q7</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is the correct way to exclude specific files from being used by GitHub Copilot Business during code suggestions?</p>
+  <div class="choices">
+        <label class="opt" id="opt-7-A">
+          <input type="radio" name="q7" value="A" />
+          <span>A. Modify the .gitignore file to include the specific files.</span>
+        </label>
+        <label class="opt" id="opt-7-B">
+          <input type="radio" name="q7" value="B" />
+          <span>B. Add the specific files to a copilot.ignore file.</span>
+        </label>
+        <label class="opt" id="opt-7-C">
+          <input type="radio" name="q7" value="C" />
+          <span>C. Use the GitHub Copilot settings in the user interface to exclude files.</span>
+        </label>
+        <label class="opt" id="opt-7-D">
+          <input type="radio" name="q7" value="D" />
+          <span>D. Rename the files to include the suffix _no_copilot.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(7, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(7, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(7)">Reset</button>
+  </div>
+  <div class="q-result" id="result-7"></div>
+</div>
+
+<div class="q" id="q8">
+  <div class="q-header">
+    <span class="q-num">Q8</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is Best way to share feedback about GitHub Copilot Chat on GitHub Mobile?</p>
+  <div class="choices">
+        <label class="opt" id="opt-8-A">
+          <input type="radio" name="q8" value="A" />
+          <span>A. The feedback section on the GitHub website</span>
+        </label>
+        <label class="opt" id="opt-8-B">
+          <input type="radio" name="q8" value="B" />
+          <span>B. By tweeting at GitHub’s official X (previously known as Twitter) account.</span>
+        </label>
+        <label class="opt" id="opt-8-C">
+          <input type="radio" name="q8" value="C" />
+          <span>C. Use the emojis in the Copilot Chat interface.</span>
+        </label>
+        <label class="opt" id="opt-8-D">
+          <input type="radio" name="q8" value="D" />
+          <span>D. The Settings menu in the GitHub Mobile app.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(8, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(8, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(8)">Reset</button>
+  </div>
+  <div class="q-result" id="result-8"></div>
+</div>
+
+<div class="q" id="q9">
+  <div class="q-header">
+    <span class="q-num">Q9</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What GitHub Copilot feature can be configured at the organization level to prevent GitHub Copilot suggesting public code?</p>
+  <div class="choices">
+        <label class="opt" id="opt-9-A">
+          <input type="radio" name="q9" value="A" />
+          <span>A. GitHub Copilot Chat in the IDE</span>
+        </label>
+        <label class="opt" id="opt-9-B">
+          <input type="radio" name="q9" value="B" />
+          <span>B. GitHub Copilot Chat in GitHub Mobile</span>
+        </label>
+        <label class="opt" id="opt-9-C">
+          <input type="radio" name="q9" value="C" />
+          <span>C. GitHub Copilot duplication detection filter</span>
+        </label>
+        <label class="opt" id="opt-9-D">
+          <input type="radio" name="q9" value="D" />
+          <span>D. GitHub Copilot access to Bing</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(9, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(9, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(9)">Reset</button>
+  </div>
+  <div class="q-result" id="result-9"></div>
+</div>
+
+<div class="q" id="q10">
+  <div class="q-header">
+    <span class="q-num">Q10</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What are the potential limitations of GitHub Copilot Chat?</p>
+  <div class="choices">
+        <label class="opt" id="opt-10-A">
+          <input type="checkbox" name="q10" value="A" />
+          <span>A. Limited training data</span>
+        </label>
+        <label class="opt" id="opt-10-B">
+          <input type="checkbox" name="q10" value="B" />
+          <span>B. Ability to handle complex code structures</span>
+        </label>
+        <label class="opt" id="opt-10-C">
+          <input type="checkbox" name="q10" value="C" />
+          <span>C. No biases in code suggestions</span>
+        </label>
+        <label class="opt" id="opt-10-D">
+          <input type="checkbox" name="q10" value="D" />
+          <span>D. Extensive support for all programming languages</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(10, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(10, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(10)">Reset</button>
+  </div>
+  <div class="q-result" id="result-10"></div>
+</div>
+
+<div class="q" id="q11">
+  <div class="q-header">
+    <span class="q-num">Q11</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What method can be used to interact with GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-11-A">
+          <input type="radio" name="q11" value="A" />
+          <span>A. By using a property configured GitHub CLI</span>
+        </label>
+        <label class="opt" id="opt-11-B">
+          <input type="radio" name="q11" value="B" />
+          <span>B. By using chat capabilities in NeoVim</span>
+        </label>
+        <label class="opt" id="opt-11-C">
+          <input type="radio" name="q11" value="C" />
+          <span>C. From a watch window in an IDE debug session</span>
+        </label>
+        <label class="opt" id="opt-11-D">
+          <input type="radio" name="q11" value="D" />
+          <span>D. From a web browser at https://github.copilot.com</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(11, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(11, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(11)">Reset</button>
+  </div>
+  <div class="q-result" id="result-11"></div>
+</div>
+
+<div class="q" id="q12">
+  <div class="q-header">
+    <span class="q-num">Q12</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">Which of the following prompts can be used to guide GitHub Copilot Chat in refactoring code for quality improvements? (Choose two.)</p>
+  <div class="choices">
+        <label class="opt" id="opt-12-A">
+          <input type="checkbox" name="q12" value="A" />
+          <span>A. "Show me how to improve the readability of this function."</span>
+        </label>
+        <label class="opt" id="opt-12-B">
+          <input type="checkbox" name="q12" value="B" />
+          <span>B. "Suggest ways to enhance the maintainability of this code segment."</span>
+        </label>
+        <label class="opt" id="opt-12-C">
+          <input type="checkbox" name="q12" value="C" />
+          <span>C. "Refactor my application meet the latest coding standards."</span>
+        </label>
+        <label class="opt" id="opt-12-D">
+          <input type="checkbox" name="q12" value="D" />
+          <span>D. "Predict future coding trends and update my codebase accordingly."</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(12, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(12, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(12)">Reset</button>
+  </div>
+  <div class="q-result" id="result-12"></div>
+</div>
+
+<div class="q" id="q13">
+  <div class="q-header">
+    <span class="q-num">Q13</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">Which REST API endpoint is used to modify details about a GitHub Copilot Business subscription?</p>
+  <div class="choices">
+        <label class="opt" id="opt-13-A">
+          <input type="checkbox" name="q13" value="A" />
+          <span>A. Add teams to the Copilot subscription for an organization</span>
+        </label>
+        <label class="opt" id="opt-13-B">
+          <input type="checkbox" name="q13" value="B" />
+          <span>B. Upgrade or downgrade the subscription tier</span>
+        </label>
+        <label class="opt" id="opt-13-C">
+          <input type="checkbox" name="q13" value="C" />
+          <span>C. Migrate Copilot seat assignments between GitHub organizations</span>
+        </label>
+        <label class="opt" id="opt-13-D">
+          <input type="checkbox" name="q13" value="D" />
+          <span>D. Reassign Copilot seats base on GitHub repository size</span>
+        </label>
+        <label class="opt" id="opt-13-E">
+          <input type="checkbox" name="q13" value="E" />
+          <span>E. Remove teams from the Copilot subscription for an organization</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(13, ['A', 'E'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(13, ['A', 'E'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(13)">Reset</button>
+  </div>
+  <div class="q-result" id="result-13"></div>
+</div>
+
+<div class="q" id="q14">
+  <div class="q-header">
+    <span class="q-num">Q14</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">How can you use GitHub Copilot to get inline suggestions for refactoring your code?</p>
+  <div class="choices">
+        <label class="opt" id="opt-14-A">
+          <input type="checkbox" name="q14" value="A" />
+          <span>A. By adding comments to your code and triggering a suggestion. </span>
+        </label>
+        <label class="opt" id="opt-14-B">
+          <input type="checkbox" name="q14" value="B" />
+          <span>B. By highlighting the code you want to fix, right-clicking, and</span>
+        </label>
+        <label class="opt" id="opt-14-C">
+          <input type="checkbox" name="q14" value="C" />
+          <span>C. By running the gh copilot fix command.</span>
+        </label>
+        <label class="opt" id="opt-14-D">
+          <input type="checkbox" name="q14" value="D" />
+          <span>D. By using the "/fix" command in GitHub Copilot in-line chat.</span>
+        </label>
+        <label class="opt" id="opt-14-E">
+          <input type="checkbox" name="q14" value="E" />
+          <span>E. By highlighting the code, you want to fix, right-clicking, and</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(14, ['A', 'D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(14, ['A', 'D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(14)">Reset</button>
+  </div>
+  <div class="q-result" id="result-14"></div>
+</div>
+
+<div class="q" id="q15">
+  <div class="q-header">
+    <span class="q-num">Q15</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How does GitHub Copilot Chat help in understanding the existing codebase?</p>
+  <div class="choices">
+        <label class="opt" id="opt-15-A">
+          <input type="radio" name="q15" value="A" />
+          <span>A. By running code linters and formatters.</span>
+        </label>
+        <label class="opt" id="opt-15-B">
+          <input type="radio" name="q15" value="B" />
+          <span>B. By providing visual diagrams of the code structure.</span>
+        </label>
+        <label class="opt" id="opt-15-C">
+          <input type="radio" name="q15" value="C" />
+          <span>C. By answering questions about the code and generating explanations.</span>
+        </label>
+        <label class="opt" id="opt-15-D">
+          <input type="radio" name="q15" value="D" />
+          <span>D. By automatically refactoring code to improve readabilit</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(15, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(15, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(15)">Reset</button>
+  </div>
+  <div class="q-result" id="result-15"></div>
+</div>
+
+<div class="q" id="q16">
+  <div class="q-header">
+    <span class="q-num">Q16</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">How does GitHub Copilot Enterprise assist in code reviews during the pull request process?</p>
+  <div class="choices">
+        <label class="opt" id="opt-16-A">
+          <input type="checkbox" name="q16" value="A" />
+          <span>A. It automatically merges pull requests after an automated review.</span>
+        </label>
+        <label class="opt" id="opt-16-B">
+          <input type="checkbox" name="q16" value="B" />
+          <span>B. It generates a prose summary and a bulleted list of key changes for pull requests.</span>
+        </label>
+        <label class="opt" id="opt-16-C">
+          <input type="checkbox" name="q16" value="C" />
+          <span>C. It can validate the accuracy of the changes in the pull request.</span>
+        </label>
+        <label class="opt" id="opt-16-D">
+          <input type="checkbox" name="q16" value="D" />
+          <span>D. It can answer questions about the changeset of the pull request.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(16, ['B', 'D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(16, ['B', 'D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(16)">Reset</button>
+  </div>
+  <div class="q-result" id="result-16"></div>
+</div>
+
+<div class="q" id="q17">
+  <div class="q-header">
+    <span class="q-num">Q17</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What configuration needs to be set to get help from Microsoft and GitHub protecting against license issues?</p>
+  <div class="choices">
+        <label class="opt" id="opt-17-A">
+          <input type="radio" name="q17" value="A" />
+          <span>A. Suggestions matching public code to 'blocked'</span>
+        </label>
+        <label class="opt" id="opt-17-B">
+          <input type="radio" name="q17" value="B" />
+          <span>B. Enforce blocking of MIT or GPL licensed code</span>
+        </label>
+        <label class="opt" id="opt-17-C">
+          <input type="radio" name="q17" value="C" />
+          <span>C. You need to check code suggestions yourself before accepting</span>
+        </label>
+        <label class="opt" id="opt-17-D">
+          <input type="radio" name="q17" value="D" />
+          <span>D. Enabled GitHub Copilot license checking</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(17, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(17, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(17)">Reset</button>
+  </div>
+  <div class="q-result" id="result-17"></div>
+</div>
+
+<div class="q" id="q18">
+  <div class="q-header">
+    <span class="q-num">Q18</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What kind of insights can the GitHub Copilot usage metrics API provide to help evaluate the effectiveness of GitHub Copilot? (Choose two.)</p>
+  <div class="choices">
+        <label class="opt" id="opt-18-A">
+          <input type="checkbox" name="q18" value="A" />
+          <span>A. The API can generate detailed reports on code quality improvements made by GitHub Copitot.</span>
+        </label>
+        <label class="opt" id="opt-18-B">
+          <input type="checkbox" name="q18" value="B" />
+          <span>B. The API can track the number of code suggestions accepted and used in the organization.</span>
+        </label>
+        <label class="opt" id="opt-18-C">
+          <input type="checkbox" name="q18" value="C" />
+          <span>C. The API can refactor your code to improve productivity.</span>
+        </label>
+        <label class="opt" id="opt-18-D">
+          <input type="checkbox" name="q18" value="D" />
+          <span>D. The API can provide feedback on coding style and standards compliance.</span>
+        </label>
+        <label class="opt" id="opt-18-E">
+          <input type="checkbox" name="q18" value="E" />
+          <span>E. The API can provide Copilot Chat specific suggestions acceptance metrics.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(18, ['B', 'E'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(18, ['B', 'E'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(18)">Reset</button>
+  </div>
+  <div class="q-result" id="result-18"></div>
+</div>
+
+<div class="q" id="q19">
+  <div class="q-header">
+    <span class="q-num">Q19</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">An independent contractor develops applications for a variety of different customers. Assuming no contractual restrictions, which GitHub Copilot plan is appropriate?</p>
+  <div class="choices">
+        <label class="opt" id="opt-19-A">
+          <input type="radio" name="q19" value="A" />
+          <span>A. GitHub Copilot individual</span>
+        </label>
+        <label class="opt" id="opt-19-B">
+          <input type="radio" name="q19" value="B" />
+          <span>B. GitHub Copilot Business</span>
+        </label>
+        <label class="opt" id="opt-19-C">
+          <input type="radio" name="q19" value="C" />
+          <span>C. GitHub Copilot Business for non-GHE Customers</span>
+        </label>
+        <label class="opt" id="opt-19-D">
+          <input type="radio" name="q19" value="D" />
+          <span>D. GitHub Copilot Enterprise</span>
+        </label>
+        <label class="opt" id="opt-19-E">
+          <input type="radio" name="q19" value="E" />
+          <span>E. GitHub Copilot Teams</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(19, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(19, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(19)">Reset</button>
+  </div>
+  <div class="q-result" id="result-19"></div>
+</div>
+
+<div class="q" id="q20">
+  <div class="q-header">
+    <span class="q-num">Q20</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How does the /tests slash command assist developers?</p>
+  <div class="choices">
+        <label class="opt" id="opt-20-A">
+          <input type="radio" name="q20" value="A" />
+          <span>A. Constructs detailed test documentation.</span>
+        </label>
+        <label class="opt" id="opt-20-B">
+          <input type="radio" name="q20" value="B" />
+          <span>B. Creates unit tests for the selected code.</span>
+        </label>
+        <label class="opt" id="opt-20-C">
+          <input type="radio" name="q20" value="C" />
+          <span>C. Integrates with external testing frameworks.</span>
+        </label>
+        <label class="opt" id="opt-20-D">
+          <input type="radio" name="q20" value="D" />
+          <span>D. Executes test cases to find issues with the code.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(20, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(20, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(20)">Reset</button>
+  </div>
+  <div class="q-result" id="result-20"></div>
+</div>
+
+<div class="q" id="q21">
+  <div class="q-header">
+    <span class="q-num">Q21</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is a key consideration when relying on GitHub Copilot Chat’s explanations of code?</p>
+  <div class="choices">
+        <label class="opt" id="opt-21-A">
+          <input type="radio" name="q21" value="A" />
+          <span>A. The explanations are dynamically updated based on user feedback.</span>
+        </label>
+        <label class="opt" id="opt-21-B">
+          <input type="radio" name="q21" value="B" />
+          <span>B. Reviewing and validating the generated output for accuracy and completeness.</span>
+        </label>
+        <label class="opt" id="opt-21-C">
+          <input type="radio" name="q21" value="C" />
+          <span>C. GitHub Copilot Chat uses a static database for generating explanations.</span>
+        </label>
+        <label class="opt" id="opt-21-D">
+          <input type="radio" name="q21" value="D" />
+          <span>D. The explanations are primarily derived from user-provided documentation.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(21, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(21, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(21)">Reset</button>
+  </div>
+  <div class="q-result" id="result-21"></div>
+</div>
+
+<div class="q" id="q22">
+  <div class="q-header">
+    <span class="q-num">Q22</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following is a risk associated with using AI?</p>
+  <div class="choices">
+        <label class="opt" id="opt-22-A">
+          <input type="radio" name="q22" value="A" />
+          <span>A. AI algorithms are incapable of perpetuating existing biases.</span>
+        </label>
+        <label class="opt" id="opt-22-B">
+          <input type="radio" name="q22" value="B" />
+          <span>B. AI systems can sometimes make decisions that are difficult to interpret.</span>
+        </label>
+        <label class="opt" id="opt-22-C">
+          <input type="radio" name="q22" value="C" />
+          <span>C. AI eliminates the need for data privacy regulations.</span>
+        </label>
+        <label class="opt" id="opt-22-D">
+          <input type="radio" name="q22" value="D" />
+          <span>D. AI replaces the need for developer opportunities in most fields.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(22, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(22, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(22)">Reset</button>
+  </div>
+  <div class="q-result" id="result-22"></div>
+</div>
+
+<div class="q" id="q23">
+  <div class="q-header">
+    <span class="q-num">Q23</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What should developers consider when relying on GitHub Copilot for generating code that involves statistical analysis?</p>
+  <div class="choices">
+        <label class="opt" id="opt-23-A">
+          <input type="radio" name="q23" value="A" />
+          <span>A. GitHub Copilot can independently verify the statistical significance of results.</span>
+        </label>
+        <label class="opt" id="opt-23-B">
+          <input type="radio" name="q23" value="B" />
+          <span>B. GitHub Copilot's suggestions are based on statistical trends may not always apply accurately to specific datasets.</span>
+        </label>
+        <label class="opt" id="opt-23-C">
+          <input type="radio" name="q23" value="C" />
+          <span>C. GitHub Copilot will automatically correct any statistical errors found in the user's initial code.</span>
+        </label>
+        <label class="opt" id="opt-23-D">
+          <input type="radio" name="q23" value="D" />
+          <span>D. GitHub Copilot can design new statistical methods that have not been previously documented.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(23, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(23, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(23)">Reset</button>
+  </div>
+  <div class="q-result" id="result-23"></div>
+</div>
+
+<div class="q" id="q24">
+  <div class="q-header">
+    <span class="q-num">Q24</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What role does chat history play in GitHub Copilot’s code suggestions?</p>
+  <div class="choices">
+        <label class="opt" id="opt-24-A">
+          <input type="radio" name="q24" value="A" />
+          <span>A. Chat history is used to train the GitHub Copilot model in real-time.</span>
+        </label>
+        <label class="opt" id="opt-24-B">
+          <input type="radio" name="q24" value="B" />
+          <span>B. Chat history provides context to GitHub Copilot, improving the relevance and accuracy of its code suggestions.</span>
+        </label>
+        <label class="opt" id="opt-24-C">
+          <input type="radio" name="q24" value="C" />
+          <span>C. Chat history is stored and shared with other users to enhance collaboration.</span>
+        </label>
+        <label class="opt" id="opt-24-D">
+          <input type="radio" name="q24" value="D" />
+          <span>D. Chat history is irrelevant to GitHub Copilot and does not affect its functionality.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(24, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(24, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(24)">Reset</button>
+  </div>
+  <div class="q-result" id="result-24"></div>
+</div>
+
+<div class="q" id="q25">
+  <div class="q-header">
+    <span class="q-num">Q25</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following GitHub Copilot Business related activities can be tracked using the organization audit logs?</p>
+  <div class="choices">
+        <label class="opt" id="opt-25-A">
+          <input type="radio" name="q25" value="A" />
+          <span>A. Accepted chat suggestions</span>
+        </label>
+        <label class="opt" id="opt-25-B">
+          <input type="radio" name="q25" value="B" />
+          <span>B. Code suggestions made by GitHub Copilot</span>
+        </label>
+        <label class="opt" id="opt-25-C">
+          <input type="radio" name="q25" value="C" />
+          <span>C. Changes to content exclusion settings</span>
+        </label>
+        <label class="opt" id="opt-25-D">
+          <input type="radio" name="q25" value="D" />
+          <span>D. Suggestions blocked by duplication detection filtering</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(25, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(25, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(25)">Reset</button>
+  </div>
+  <div class="q-result" id="result-25"></div>
+</div>
+
+<div class="q" id="q26">
+  <div class="q-header">
+    <span class="q-num">Q26</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How long does it take content exclusion to add or be updated?</p>
+  <div class="choices">
+        <label class="opt" id="opt-26-A">
+          <input type="radio" name="q26" value="A" />
+          <span>A. Up to 30 minutes</span>
+        </label>
+        <label class="opt" id="opt-26-B">
+          <input type="radio" name="q26" value="B" />
+          <span>B. 45-60 minutes</span>
+        </label>
+        <label class="opt" id="opt-26-C">
+          <input type="radio" name="q26" value="C" />
+          <span>C. 60-90 minutes</span>
+        </label>
+        <label class="opt" id="opt-26-D">
+          <input type="radio" name="q26" value="D" />
+          <span>D. 24 hours</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(26, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(26, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(26)">Reset</button>
+  </div>
+  <div class="q-result" id="result-26"></div>
+</div>
+
+<div class="q" id="q27">
+  <div class="q-header">
+    <span class="q-num">Q27</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What do you check when GitHub Copilot content exclusions are not working? (Choose two.)</p>
+  <div class="choices">
+        <label class="opt" id="opt-27-A">
+          <input type="checkbox" name="q27" value="A" />
+          <span>A. If the user is in an organization that has content exclusions configured.</span>
+        </label>
+        <label class="opt" id="opt-27-B">
+          <input type="checkbox" name="q27" value="B" />
+          <span>B. If the content exclusion settings changed in the last 30 minutes or before that.</span>
+        </label>
+        <label class="opt" id="opt-27-C">
+          <input type="checkbox" name="q27" value="C" />
+          <span>C. If GitHub Copilot can connect to the server selected in your user settings.</span>
+        </label>
+        <label class="opt" id="opt-27-D">
+          <input type="checkbox" name="q27" value="D" />
+          <span>D. If the user is part of the content exclusion team that limits the use of content exclusions.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(27, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(27, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(27)">Reset</button>
+  </div>
+  <div class="q-result" id="result-27"></div>
+</div>
+
+<div class="q" id="q28">
+  <div class="q-header">
+    <span class="q-num">Q28</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">How is GitHub Copilot Individual billed?</p>
+  <div class="choices">
+        <label class="opt" id="opt-28-A">
+          <input type="checkbox" name="q28" value="A" />
+          <span>A. Monthly as a subscription</span>
+        </label>
+        <label class="opt" id="opt-28-B">
+          <input type="checkbox" name="q28" value="B" />
+          <span>B. Annually as a subscription</span>
+        </label>
+        <label class="opt" id="opt-28-C">
+          <input type="checkbox" name="q28" value="C" />
+          <span>C. Monthly, as a metered service based on actual consumption</span>
+        </label>
+        <label class="opt" id="opt-28-D">
+          <input type="checkbox" name="q28" value="D" />
+          <span>D. Free (not billed) for all open source projects</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(28, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(28, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(28)">Reset</button>
+  </div>
+  <div class="q-result" id="result-28"></div>
+</div>
+
+<div class="q" id="q29">
+  <div class="q-header">
+    <span class="q-num">Q29</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">How can GitHub Copilot help when learning a new programming language?</p>
+  <div class="choices">
+        <label class="opt" id="opt-29-A">
+          <input type="checkbox" name="q29" value="A" />
+          <span>A. GitHub Copilot Chat can provide guidance and support for common coding tasks and challenges in the targeted programming language.</span>
+        </label>
+        <label class="opt" id="opt-29-B">
+          <input type="checkbox" name="q29" value="B" />
+          <span>B. GitHub Copilot's /understand command will help GitHub Copilot to understand code written in a targeted programming language.</span>
+        </label>
+        <label class="opt" id="opt-29-C">
+          <input type="checkbox" name="q29" value="C" />
+          <span>C. GitHub Copilot can provide contextualized code suggestions and answer sources from an organization's documentation.</span>
+        </label>
+        <label class="opt" id="opt-29-D">
+          <input type="checkbox" name="q29" value="D" />
+          <span>D. GitHub Copilot can convert comments into code to grasp the syntax and nuances of a new programming language.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(29, ['A', 'D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(29, ['A', 'D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(29)">Reset</button>
+  </div>
+  <div class="q-result" id="result-29"></div>
+</div>
+
+<div class="q" id="q30">
+  <div class="q-header">
+    <span class="q-num">Q30</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What are the potential risks associated with relying heavily on code generated from GitHub Copilot? (Each correct answer represents part of the solution)</p>
+  <div class="choices">
+        <label class="opt" id="opt-30-A">
+          <input type="checkbox" name="q30" value="A" />
+          <span>A. GitHub Copilot may introduce security vulnerabilities by suggesting code with known exploits.</span>
+        </label>
+        <label class="opt" id="opt-30-B">
+          <input type="checkbox" name="q30" value="B" />
+          <span>B. GitHub Copilot may decrease developer velocity by requiring too much time in prompt engineering.</span>
+        </label>
+        <label class="opt" id="opt-30-C">
+          <input type="checkbox" name="q30" value="C" />
+          <span>C. GitHub Copilot's suggestions may not always reflect best practices or the latest coding standards.</span>
+        </label>
+        <label class="opt" id="opt-30-D">
+          <input type="checkbox" name="q30" value="D" />
+          <span>D. GitHub Copilot may increase development lead time b</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(30, ['A', 'C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(30, ['A', 'C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(30)">Reset</button>
+  </div>
+  <div class="q-result" id="result-30"></div>
+</div>
+
+<div class="q" id="q31">
+  <div class="q-header">
+    <span class="q-num">Q31</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is the process behind identifying public node matches when using a public code filter enabled in GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-31-A">
+          <input type="radio" name="q31" value="A" />
+          <span>A. Running code suggestions through filters designed to detect public code</span>
+        </label>
+        <label class="opt" id="opt-31-B">
+          <input type="radio" name="q31" value="B" />
+          <span>B. Comparing suggestions against public code using machine learning</span>
+        </label>
+        <label class="opt" id="opt-31-C">
+          <input type="radio" name="q31" value="C" />
+          <span>C. Analyzing the context and structure of the code being written</span>
+        </label>
+        <label class="opt" id="opt-31-D">
+          <input type="radio" name="q31" value="D" />
+          <span>D. Reviewing the user's browsing history to identify public repositories</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(31, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(31, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(31)">Reset</button>
+  </div>
+  <div class="q-result" id="result-31"></div>
+</div>
+
+<div class="q" id="q32">
+  <div class="q-header">
+    <span class="q-num">Q32</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which statement best describes the impact of GitHub Copilot on the software development process?</p>
+  <div class="choices">
+        <label class="opt" id="opt-32-A">
+          <input type="radio" name="q32" value="A" />
+          <span>A. It decreases software vulnerabilities from third party dependencies.</span>
+        </label>
+        <label class="opt" id="opt-32-B">
+          <input type="radio" name="q32" value="B" />
+          <span>B. It reduces developer overhead by automating testing workflows.</span>
+        </label>
+        <label class="opt" id="opt-32-C">
+          <input type="radio" name="q32" value="C" />
+          <span>C. It increases productivity by automating repetitive coding tasks.</span>
+        </label>
+        <label class="opt" id="opt-32-D">
+          <input type="radio" name="q32" value="D" />
+          <span>D. It replaces the need for developers in the software development process.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(32, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(32, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(32)">Reset</button>
+  </div>
+  <div class="q-result" id="result-32"></div>
+</div>
+
+<div class="q" id="q33">
+  <div class="q-header">
+    <span class="q-num">Q33</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What method can a developer use to generate sample data with GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-33-A">
+          <input type="checkbox" name="q33" value="A" />
+          <span>A. Utilizing GitHub Copilot's ability to create fictitious information from patterns in training data</span>
+        </label>
+        <label class="opt" id="opt-33-B">
+          <input type="checkbox" name="q33" value="B" />
+          <span>B. Leveraging GitHub Copilot's ability to independently initiate and manage data storage services.</span>
+        </label>
+        <label class="opt" id="opt-33-C">
+          <input type="checkbox" name="q33" value="C" />
+          <span>C. Utilize GitHub Copilot's capability to directly access and use databases to create sample data.</span>
+        </label>
+        <label class="opt" id="opt-33-D">
+          <input type="checkbox" name="q33" value="D" />
+          <span>D. Leveraging GitHub Copilot's suggestions to create data based on API documentation in the repository. s</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(33, ['A', 'D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(33, ['A', 'D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(33)">Reset</button>
+  </div>
+  <div class="q-result" id="result-33"></div>
+</div>
+
+<div class="q" id="q34">
+  <div class="q-header">
+    <span class="q-num">Q34</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which Microsoft ethical AI principle is aimed at ensuring AI systems treat all people equally?</p>
+  <div class="choices">
+        <label class="opt" id="opt-34-A">
+          <input type="radio" name="q34" value="A" />
+          <span>A. Privacy and Security</span>
+        </label>
+        <label class="opt" id="opt-34-B">
+          <input type="radio" name="q34" value="B" />
+          <span>B. Fairness</span>
+        </label>
+        <label class="opt" id="opt-34-C">
+          <input type="radio" name="q34" value="C" />
+          <span>C. Reliability and Safety</span>
+        </label>
+        <label class="opt" id="opt-34-D">
+          <input type="radio" name="q34" value="D" />
+          <span>D. Inclusiveness</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(34, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(34, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(34)">Reset</button>
+  </div>
+  <div class="q-result" id="result-34"></div>
+</div>
+
+<div class="q" id="q35">
+  <div class="q-header">
+    <span class="q-num">Q35</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">A company is currently storing code in Bitbucket and would like to use GitHub Copilot. Which GitHub Copilot plan will be most appropriate if they want to integrate with an Identity Provider (e.g. Okta)?</p>
+  <div class="choices">
+        <label class="opt" id="opt-35-A">
+          <input type="radio" name="q35" value="A" />
+          <span>A. GitHub Copilot Business for non-GHE customers</span>
+        </label>
+        <label class="opt" id="opt-35-B">
+          <input type="radio" name="q35" value="B" />
+          <span>B. GitHub Copilot Individual</span>
+        </label>
+        <label class="opt" id="opt-35-C">
+          <input type="radio" name="q35" value="C" />
+          <span>C. GitHub Copilot Enterprise</span>
+        </label>
+        <label class="opt" id="opt-35-D">
+          <input type="radio" name="q35" value="D" />
+          <span>D. GitHub Copilot Teams</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(35, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(35, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(35)">Reset</button>
+  </div>
+  <div class="q-result" id="result-35"></div>
+</div>
+
+<div class="q" id="q36">
+  <div class="q-header">
+    <span class="q-num">Q36</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What should developers consider when relying on GitHub Copilot for generating code that involves statistical analysis?</p>
+  <div class="choices">
+        <label class="opt" id="opt-36-A">
+          <input type="radio" name="q36" value="A" />
+          <span>A. GitHub Copilot can independently verify the statistical significance of results.</span>
+        </label>
+        <label class="opt" id="opt-36-B">
+          <input type="radio" name="q36" value="B" />
+          <span>B. GitHub Copilot's suggestions are based on statistical trends may not always apply accurately to specific datasets.</span>
+        </label>
+        <label class="opt" id="opt-36-C">
+          <input type="radio" name="q36" value="C" />
+          <span>C. GitHub Copilot will automatically correct any statistical errors found in the user's initial code.</span>
+        </label>
+        <label class="opt" id="opt-36-D">
+          <input type="radio" name="q36" value="D" />
+          <span>D. GitHub Copilot can design new statistical methods that have not been previously documented.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(36, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(36, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(36)">Reset</button>
+  </div>
+  <div class="q-result" id="result-36"></div>
+</div>
+
+<div class="q" id="q37">
+  <div class="q-header">
+    <span class="q-num">Q37</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which principle emphasizes that AI systems should be understandable and provide clear information on how they work?</p>
+  <div class="choices">
+        <label class="opt" id="opt-37-A">
+          <input type="radio" name="q37" value="A" />
+          <span>A. Fairness</span>
+        </label>
+        <label class="opt" id="opt-37-B">
+          <input type="radio" name="q37" value="B" />
+          <span>B. Transparency</span>
+        </label>
+        <label class="opt" id="opt-37-C">
+          <input type="radio" name="q37" value="C" />
+          <span>C. Inclusiveness</span>
+        </label>
+        <label class="opt" id="opt-37-D">
+          <input type="radio" name="q37" value="D" />
+          <span>D. Accountability</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(37, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(37, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(37)">Reset</button>
+  </div>
+  <div class="q-result" id="result-37"></div>
+</div>
+
+<div class="q" id="q38">
+  <div class="q-header">
+    <span class="q-num">Q38</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following scenarios best describes the intended use ofGitHub Copilot Chat as a tool?</p>
+  <div class="choices">
+        <label class="opt" id="opt-38-A">
+          <input type="radio" name="q38" value="A" />
+          <span>A. A complete replacement for developers generating code.</span>
+        </label>
+        <label class="opt" id="opt-38-B">
+          <input type="radio" name="q38" value="B" />
+          <span>B. A productivity tool that provides suggestions, but relying on human judgment.</span>
+        </label>
+        <label class="opt" id="opt-38-C">
+          <input type="radio" name="q38" value="C" />
+          <span>C. A solution for software development, requiring no additional input or oversight.</span>
+        </label>
+        <label class="opt" id="opt-38-D">
+          <input type="radio" name="q38" value="D" />
+          <span>D. A tool solely designed for debugging and error correction.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(38, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(38, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(38)">Reset</button>
+  </div>
+  <div class="q-result" id="result-38"></div>
+</div>
+
+<div class="q" id="q39">
+  <div class="q-header">
+    <span class="q-num">Q39</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What are the supported integrated development environment extensions for GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-39-A">
+          <input type="radio" name="q39" value="A" />
+          <span>A. Visual Studio Code and Visual Studio.</span>
+        </label>
+        <label class="opt" id="opt-39-B">
+          <input type="radio" name="q39" value="B" />
+          <span>B. GitHub.com, Visual Studio Code, Visual Studio, Neovim, and JetBrains.</span>
+        </label>
+        <label class="opt" id="opt-39-C">
+          <input type="radio" name="q39" value="C" />
+          <span>C. Visual Studio Code, Visual Studio, Neovim, and JetBrains.</span>
+        </label>
+        <label class="opt" id="opt-39-D">
+          <input type="radio" name="q39" value="D" />
+          <span>D. Only Visual Studio Code.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(39, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(39, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(39)">Reset</button>
+  </div>
+  <div class="q-result" id="result-39"></div>
+</div>
+
+<div class="q" id="q40">
+  <div class="q-header">
+    <span class="q-num">Q40</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What types of prompts or code snippets might be flagged by the GitHub Copilot toxicity filter? (Choose two.)</p>
+  <div class="choices">
+        <label class="opt" id="opt-40-A">
+          <input type="checkbox" name="q40" value="A" />
+          <span>A. Hate speech or discriminatory language (e.g., racial slurs, offensive stereotypes)</span>
+        </label>
+        <label class="opt" id="opt-40-B">
+          <input type="checkbox" name="q40" value="B" />
+          <span>B. Sexually suggestive or explicit content</span>
+        </label>
+        <label class="opt" id="opt-40-C">
+          <input type="checkbox" name="q40" value="C" />
+          <span>C. Code that contains logical errors or produces unexpected results</span>
+        </label>
+        <label class="opt" id="opt-40-D">
+          <input type="checkbox" name="q40" value="D" />
+          <span>D. Code comments containing strong opinions or criticisms</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(40, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(40, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(40)">Reset</button>
+  </div>
+  <div class="q-result" id="result-40"></div>
+</div>
+
+<div class="q" id="q41">
+  <div class="q-header">
+    <span class="q-num">Q41</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How can GitHub Copilot assist with code refactoring tasks?</p>
+  <div class="choices">
+        <label class="opt" id="opt-41-A">
+          <input type="radio" name="q41" value="A" />
+          <span>A. GitHub Copilot can fix syntax errors without user input.</span>
+        </label>
+        <label class="opt" id="opt-41-B">
+          <input type="radio" name="q41" value="B" />
+          <span>B. GitHub Copilot can automatically rewrite code to follow best practices.</span>
+        </label>
+        <label class="opt" id="opt-41-C">
+          <input type="radio" name="q41" value="C" />
+          <span>C. GitHub Copilot can suggest refactoring improvements for better code quality.</span>
+        </label>
+        <label class="opt" id="opt-41-D">
+          <input type="radio" name="q41" value="D" />
+          <span>D. GitHub Copilot can remove unnecessary files from the project directory</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(41, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(41, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(41)">Reset</button>
+  </div>
+  <div class="q-result" id="result-41"></div>
+</div>
+
+<div class="q" id="q42">
+  <div class="q-header">
+    <span class="q-num">Q42</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What limitation should developers keep in mind when using GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-42-A">
+          <input type="radio" name="q42" value="A" />
+          <span>A. Copilot requires a Windows operating system</span>
+        </label>
+        <label class="opt" id="opt-42-B">
+          <input type="radio" name="q42" value="B" />
+          <span>B. Suggestions may include insecure or deprecated patterns</span>
+        </label>
+        <label class="opt" id="opt-42-C">
+          <input type="radio" name="q42" value="C" />
+          <span>C. Copilot guarantees 100% test coverage</span>
+        </label>
+        <label class="opt" id="opt-42-D">
+          <input type="radio" name="q42" value="D" />
+          <span>D. Only works for Python and JavaScript</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(42, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(42, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(42)">Reset</button>
+  </div>
+  <div class="q-result" id="result-42"></div>
+</div>
+
+<div class="q" id="q43">
+  <div class="q-header">
+    <span class="q-num">Q43</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following is correct about GitHub Copilot Knowledge Bases?</p>
+  <div class="choices">
+        <label class="opt" id="opt-43-A">
+          <input type="radio" name="q43" value="A" />
+          <span>A. All repos are indexed</span>
+        </label>
+        <label class="opt" id="opt-43-B">
+          <input type="radio" name="q43" value="B" />
+          <span>B. Indexing is static</span>
+        </label>
+        <label class="opt" id="opt-43-C">
+          <input type="radio" name="q43" value="C" />
+          <span>C. It is an Enterprise feature</span>
+        </label>
+        <label class="opt" id="opt-43-D">
+          <input type="radio" name="q43" value="D" />
+          <span>D. All file types are indexed</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(43, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(43, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(43)">Reset</button>
+  </div>
+  <div class="q-result" id="result-43"></div>
+</div>
+
+<div class="q" id="q44">
+  <div class="q-header">
+    <span class="q-num">Q44</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How does GitHub Copilot suggest code optimizations for improved performance?</p>
+  <div class="choices">
+        <label class="opt" id="opt-44-A">
+          <input type="radio" name="q44" value="A" />
+          <span>A. By analyzing the codebase and suggesting more efficient algorithms or data structures.</span>
+        </label>
+        <label class="opt" id="opt-44-B">
+          <input type="radio" name="q44" value="B" />
+          <span>B. By automatically rewriting the codebase to use more efficient code.</span>
+        </label>
+        <label class="opt" id="opt-44-C">
+          <input type="radio" name="q44" value="C" />
+          <span>C. By enforcing strict coding standards that ensure optimal performance.</span>
+        </label>
+        <label class="opt" id="opt-44-D">
+          <input type="radio" name="q44" value="D" />
+          <span>D. By providing detailed reports on the performance of the codebase.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(44, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(44, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(44)">Reset</button>
+  </div>
+  <div class="q-result" id="result-44"></div>
+</div>
+
+<div class="q" id="q45">
+  <div class="q-header">
+    <span class="q-num">Q45</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Where is the proxy service hosted?</p>
+  <div class="choices">
+        <label class="opt" id="opt-45-A">
+          <input type="radio" name="q45" value="A" />
+          <span>A. Self hosted</span>
+        </label>
+        <label class="opt" id="opt-45-B">
+          <input type="radio" name="q45" value="B" />
+          <span>B. Amazon Web Service</span>
+        </label>
+        <label class="opt" id="opt-45-C">
+          <input type="radio" name="q45" value="C" />
+          <span>C. Microsoft Azure</span>
+        </label>
+        <label class="opt" id="opt-45-D">
+          <input type="radio" name="q45" value="D" />
+          <span>D. Google Cloud Platform</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(45, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(45, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(45)">Reset</button>
+  </div>
+  <div class="q-result" id="result-45"></div>
+</div>
+
+<div class="q" id="q46">
+  <div class="q-header">
+    <span class="q-num">Q46</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Select a strategy to increase the performance of GitHub Copilot Chat</p>
+  <div class="choices">
+        <label class="opt" id="opt-46-A">
+          <input type="radio" name="q46" value="A" />
+          <span>A. Use a single GitHub Copilot Chat query to find resolutions for the collection of technical requirements</span>
+        </label>
+        <label class="opt" id="opt-46-B">
+          <input type="radio" name="q46" value="B" />
+          <span>B. Limit the number of concurrent users accessing GitHub Copilot Chat</span>
+        </label>
+        <label class="opt" id="opt-46-C">
+          <input type="radio" name="q46" value="C" />
+          <span>C. Apply prompt engineering techniques to be more specific</span>
+        </label>
+        <label class="opt" id="opt-46-D">
+          <input type="radio" name="q46" value="D" />
+          <span>D. Optimize the usage of memory-intensive operations within generated code</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(46, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(46, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(46)">Reset</button>
+  </div>
+  <div class="q-result" id="result-46"></div>
+</div>
+
+<div class="q" id="q47">
+  <div class="q-header">
+    <span class="q-num">Q47</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-47-A">
+          <input type="radio" name="q47" value="A" />
+          <span>A. GitHub Copilot is an AI pair programmer that you can use to get code suggestions.</span>
+        </label>
+        <label class="opt" id="opt-47-B">
+          <input type="radio" name="q47" value="B" />
+          <span>B. GitHub Copilot is OpenAI Codex, a new AI system created by OpenAI.</span>
+        </label>
+        <label class="opt" id="opt-47-C">
+          <input type="radio" name="q47" value="C" />
+          <span>C. GitHub Copilot is a JavaScript public repository and is one of the best supported languages.</span>
+        </label>
+        <label class="opt" id="opt-47-D">
+          <input type="radio" name="q47" value="D" />
+          <span>D. GitHub Copilot is a code review tool that automatically checks for bugs.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(47, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(47, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(47)">Reset</button>
+  </div>
+  <div class="q-result" id="result-47"></div>
+</div>
+
+<div class="q" id="q48">
+  <div class="q-header">
+    <span class="q-num">Q48</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How does GitHub Copilot Chat utilize its training data and external sources?</p>
+  <div class="choices">
+        <label class="opt" id="opt-48-A">
+          <input type="radio" name="q48" value="A" />
+          <span>A. It primarily relies on the model's training data to generate responses.</span>
+        </label>
+        <label class="opt" id="opt-48-B">
+          <input type="radio" name="q48" value="B" />
+          <span>B. It primarily uses search results from Bing to generate responses.</span>
+        </label>
+        <label class="opt" id="opt-48-C">
+          <input type="radio" name="q48" value="C" />
+          <span>C. It combines its training data set, code in user repositories, and external sources like Bing to generate responses.</span>
+        </label>
+        <label class="opt" id="opt-48-D">
+          <input type="radio" name="q48" value="D" />
+          <span>D. It uses user-provided documentation and exclusively to generate responses.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(48, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(48, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(48)">Reset</button>
+  </div>
+  <div class="q-result" id="result-48"></div>
+</div>
+
+<div class="q" id="q49">
+  <div class="q-header">
+    <span class="q-num">Q49</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Why might a Generative AI tool create inaccurate outputs?</p>
+  <div class="choices">
+        <label class="opt" id="opt-49-A">
+          <input type="radio" name="q49" value="A" />
+          <span>A. The Gen AI tool is overloaded with too many requests at once.</span>
+        </label>
+        <label class="opt" id="opt-49-B">
+          <input type="radio" name="q49" value="B" />
+          <span>B. The Gen AI tool is experiencing downtime and is not fully recovered.</span>
+        </label>
+        <label class="opt" id="opt-49-C">
+          <input type="radio" name="q49" value="C" />
+          <span>C. The Gen AI tool is programmed with a focus on creativity over factual accuracy.</span>
+        </label>
+        <label class="opt" id="opt-49-D">
+          <input type="radio" name="q49" value="D" />
+          <span>D. The training data might contain biases or inconsistencies.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(49, ['D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(49, ['D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(49)">Reset</button>
+  </div>
+  <div class="q-result" id="result-49"></div>
+</div>
+
+<div class="q" id="q50">
+  <div class="q-header">
+    <span class="q-num">Q50</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">When can GitHub Copilot still use content that was excluded using content exclusion?</p>
+  <div class="choices">
+        <label class="opt" id="opt-50-A">
+          <input type="radio" name="q50" value="A" />
+          <span>A. If the contents of an excluded file are referenced in code that is not excluded, for example function calls.</span>
+        </label>
+        <label class="opt" id="opt-50-B">
+          <input type="radio" name="q50" value="B" />
+          <span>B. When the repository level settings allow overrides by the user.</span>
+        </label>
+        <label class="opt" id="opt-50-C">
+          <input type="radio" name="q50" value="C" />
+          <span>C. If the content exclusion was configured at the enterprise level, and is overwritten at the organization level.</span>
+        </label>
+        <label class="opt" id="opt-50-D">
+          <input type="radio" name="q50" value="D" />
+          <span>D. When the user prompts with @workspace.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(50, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(50, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(50)">Reset</button>
+  </div>
+  <div class="q-result" id="result-50"></div>
+</div>
+
+<div class="q" id="q51">
+  <div class="q-header">
+    <span class="q-num">Q51</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is a likely effect of GitHub Copilot being trained on commonly used code patterns?</p>
+  <div class="choices">
+        <label class="opt" id="opt-51-A">
+          <input type="radio" name="q51" value="A" />
+          <span>A. Suggest homogeneous solutions if provided a diverse data set.</span>
+        </label>
+        <label class="opt" id="opt-51-B">
+          <input type="radio" name="q51" value="B" />
+          <span>B. Suggest innovative coding solutions that are not yet popular.</span>
+        </label>
+        <label class="opt" id="opt-51-C">
+          <input type="radio" name="q51" value="C" />
+          <span>C. Suggest code snippets that reflect the most common practices in the training data.</span>
+        </label>
+        <label class="opt" id="opt-51-D">
+          <input type="radio" name="q51" value="D" />
+          <span>D. Suggest completely novel projects, while reducing time on a project.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(51, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(51, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(51)">Reset</button>
+  </div>
+  <div class="q-result" id="result-51"></div>
+</div>
+
+<div class="q" id="q52">
+  <div class="q-header">
+    <span class="q-num">Q52</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is the primary role of the '/optimize' slash command in Visual Studio?</p>
+  <div class="choices">
+        <label class="opt" id="opt-52-A">
+          <input type="radio" name="q52" value="A" />
+          <span>A. Translates code into a more performant language.</span>
+        </label>
+        <label class="opt" id="opt-52-B">
+          <input type="radio" name="q52" value="B" />
+          <span>B. Automatically formats the code according to the selected style guide.</span>
+        </label>
+        <label class="opt" id="opt-52-C">
+          <input type="radio" name="q52" value="C" />
+          <span>C. Summarizes your documentation into more maintainable and readable formats.</span>
+        </label>
+        <label class="opt" id="opt-52-D">
+          <input type="radio" name="q52" value="D" />
+          <span>D. Enhances the performance of the selected code by analyzing its runtime complexity.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(52, ['D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(52, ['D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(52)">Reset</button>
+  </div>
+  <div class="q-result" id="result-52"></div>
+</div>
+
+<div class="q" id="q53">
+  <div class="q-header">
+    <span class="q-num">Q53</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How can GitHub Copilot be limited when it comes to suggesting unit tests?</p>
+  <div class="choices">
+        <label class="opt" id="opt-53-A">
+          <input type="radio" name="q53" value="A" />
+          <span>A. GitHub copilot can generate all types of unit tests, including those for edge cases and complex integration scenarios</span>
+        </label>
+        <label class="opt" id="opt-53-B">
+          <input type="radio" name="q53" value="B" />
+          <span>B. GitHub Copilot primarily suggests basic unit tests that focus on core functionalities, often requiring additional input from developers for comprehensive coverage.</span>
+        </label>
+        <label class="opt" id="opt-53-C">
+          <input type="radio" name="q53" value="C" />
+          <span>C. GitHub Copilot can handle any complexity in code and automatically generate appropriate unit tests.</span>
+        </label>
+        <label class="opt" id="opt-53-D">
+          <input type="radio" name="q53" value="D" />
+          <span>D. GitHub Copilot's limitations in generating unit tests can vary based on the IDE version you are using.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(53, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(53, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(53)">Reset</button>
+  </div>
+  <div class="q-result" id="result-53"></div>
+</div>
+
+<div class="q" id="q54">
+  <div class="q-header">
+    <span class="q-num">Q54</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What GitHub Copilot pricing plan gives you access to your company’s knowledge bases?</p>
+  <div class="choices">
+        <label class="opt" id="opt-54-A">
+          <input type="radio" name="q54" value="A" />
+          <span>A. GitHub Copilot Individual</span>
+        </label>
+        <label class="opt" id="opt-54-B">
+          <input type="radio" name="q54" value="B" />
+          <span>B. GitHub Copilot Business</span>
+        </label>
+        <label class="opt" id="opt-54-C">
+          <input type="radio" name="q54" value="C" />
+          <span>C. GitHub Copilot Enterprise</span>
+        </label>
+        <label class="opt" id="opt-54-D">
+          <input type="radio" name="q54" value="D" />
+          <span>D. GitHub Copilot Professional</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(54, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(54, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(54)">Reset</button>
+  </div>
+  <div class="q-result" id="result-54"></div>
+</div>
+
+<div class="q" id="q55">
+  <div class="q-header">
+    <span class="q-num">Q55</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How can the concept of fairness be integrated into operating an AI tool?</p>
+  <div class="choices">
+        <label class="opt" id="opt-55-A">
+          <input type="radio" name="q55" value="A" />
+          <span>A. Focusing on accessibility will ensure fairness.</span>
+        </label>
+        <label class="opt" id="opt-55-B">
+          <input type="radio" name="q55" value="B" />
+          <span>B. Focusing on collecting large datasets for training will ensure fairness.</span>
+        </label>
+        <label class="opt" id="opt-55-C">
+          <input type="radio" name="q55" value="C" />
+          <span>C. Regularly monitoring the AI tool's performance will ensure fairness in its outputs.</span>
+        </label>
+        <label class="opt" id="opt-55-D">
+          <input type="radio" name="q55" value="D" />
+          <span>D. Training AI data and algorithms to be free from biases will ensure fairness.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(55, ['D'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(55, ['D'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(55)">Reset</button>
+  </div>
+  <div class="q-result" id="result-55"></div>
+</div>
+
+<div class="q" id="q56">
+  <div class="q-header">
+    <span class="q-num">Q56</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which of the following is the correct way to access the audit log events for GitHub Copilot Business?</p>
+  <div class="choices">
+        <label class="opt" id="opt-56-A">
+          <input type="radio" name="q56" value="A" />
+          <span>A. Navigate to the Security tab in the organization's GitHub settings</span>
+        </label>
+        <label class="opt" id="opt-56-B">
+          <input type="radio" name="q56" value="B" />
+          <span>B. Navigate to the Insights tab in the repository settings</span>
+        </label>
+        <label class="opt" id="opt-56-C">
+          <input type="radio" name="q56" value="C" />
+          <span>C. Use the Audit log section in the organization's GitHub settings</span>
+        </label>
+        <label class="opt" id="opt-56-D">
+          <input type="radio" name="q56" value="D" />
+          <span>D. Use the Code tab in the GitHub repository</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(56, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(56, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(56)">Reset</button>
+  </div>
+  <div class="q-result" id="result-56"></div>
+</div>
+
+<div class="q" id="q57">
+  <div class="q-header">
+    <span class="q-num">Q57</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is a limitation of content exclusions?</p>
+  <div class="choices">
+        <label class="opt" id="opt-57-A">
+          <input type="radio" name="q57" value="A" />
+          <span>A. Content exclusions can be worked around as it is only available for Git repositories.</span>
+        </label>
+        <label class="opt" id="opt-57-B">
+          <input type="radio" name="q57" value="B" />
+          <span>B. Content exclusions can only be configured by an enterprise administrator.</span>
+        </label>
+        <label class="opt" id="opt-57-C">
+          <input type="radio" name="q57" value="C" />
+          <span>C. Content exclusions are only available in the GitHub Copilot individual plan.</span>
+        </label>
+        <label class="opt" id="opt-57-D">
+          <input type="radio" name="q57" value="D" />
+          <span>D. Repository administrators and organization owners cannot manage content exclusion settings.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(57, ['A'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(57, ['A'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(57)">Reset</button>
+  </div>
+  <div class="q-result" id="result-57"></div>
+</div>
+
+<div class="q" id="q58">
+  <div class="q-header">
+    <span class="q-num">Q58</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What content can be configured to be excluded with content exclusions?</p>
+  <div class="choices">
+        <label class="opt" id="opt-58-A">
+          <input type="checkbox" name="q58" value="A" />
+          <span>A. Repositories</span>
+        </label>
+        <label class="opt" id="opt-58-B">
+          <input type="checkbox" name="q58" value="B" />
+          <span>B. Lines in files</span>
+        </label>
+        <label class="opt" id="opt-58-C">
+          <input type="checkbox" name="q58" value="C" />
+          <span>C. Gists</span>
+        </label>
+        <label class="opt" id="opt-58-D">
+          <input type="checkbox" name="q58" value="D" />
+          <span>D. Folders</span>
+        </label>
+        <label class="opt" id="opt-58-E">
+          <input type="checkbox" name="q58" value="E" />
+          <span>E. Files</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(58, ['A', 'D', 'E'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(58, ['A', 'D', 'E'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(58)">Reset</button>
+  </div>
+  <div class="q-result" id="result-58"></div>
+</div>
+
+<div class="q" id="q59">
+  <div class="q-header">
+    <span class="q-num">Q59</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What role does chat history play in GitHub Copilot's code suggestions?</p>
+  <div class="choices">
+        <label class="opt" id="opt-59-A">
+          <input type="radio" name="q59" value="A" />
+          <span>A. Chat history is used to train the GitHub Copilot model in real-time.</span>
+        </label>
+        <label class="opt" id="opt-59-B">
+          <input type="radio" name="q59" value="B" />
+          <span>B. Chat history provides context to GitHub Copilot, improving the relevance and accuracy of its code suggestions.</span>
+        </label>
+        <label class="opt" id="opt-59-C">
+          <input type="radio" name="q59" value="C" />
+          <span>C. Chat history is stored and shared with other users to enhance collaboration.</span>
+        </label>
+        <label class="opt" id="opt-59-D">
+          <input type="radio" name="q59" value="D" />
+          <span>D. Chat history is irrelevant to GitHub Copilot and does not affect its functionality.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(59, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(59, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(59)">Reset</button>
+  </div>
+  <div class="q-result" id="result-59"></div>
+</div>
+
+<div class="q" id="q60">
+  <div class="q-header">
+    <span class="q-num">Q60</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What configuration needs to be set to get help from Microsoft and GitHub protecting against IP infringement while using GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-60-A">
+          <input type="radio" name="q60" value="A" />
+          <span>A. Enforce blocking of MIT or GPL licensed code</span>
+        </label>
+        <label class="opt" id="opt-60-B">
+          <input type="radio" name="q60" value="B" />
+          <span>B. Suggestions matching public code to 'blocked'</span>
+        </label>
+        <label class="opt" id="opt-60-C">
+          <input type="radio" name="q60" value="C" />
+          <span>C. You need to check code suggestions yourself before accepting</span>
+        </label>
+        <label class="opt" id="opt-60-D">
+          <input type="radio" name="q60" value="D" />
+          <span>D. Enable GitHub Copilot license checking</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(60, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(60, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(60)">Reset</button>
+  </div>
+  <div class="q-result" id="result-60"></div>
+</div>
+
+<div class="q" id="q61">
+  <div class="q-header">
+    <span class="q-num">Q61</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">Identify the right use cases where GitHub Copilot Chat is most effective. (Choose two.)</p>
+  <div class="choices">
+        <label class="opt" id="opt-61-A">
+          <input type="checkbox" name="q61" value="A" />
+          <span>A. Create a technical requirement specification from the business requirement documentation</span>
+        </label>
+        <label class="opt" id="opt-61-B">
+          <input type="checkbox" name="q61" value="B" />
+          <span>B. Explain a legacy COBOL code and translate the code to another language like C#</span>
+        </label>
+        <label class="opt" id="opt-61-C">
+          <input type="checkbox" name="q61" value="C" />
+          <span>C. Creation of a unit test scenario for newly developed Python code</span>
+        </label>
+        <label class="opt" id="opt-61-D">
+          <input type="checkbox" name="q61" value="D" />
+          <span>D. Creation of end-to-end performance testing scenarios for a web application</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(61, ['B', 'C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(61, ['B', 'C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(61)">Reset</button>
+  </div>
+  <div class="q-result" id="result-61"></div>
+</div>
+
+<div class="q" id="q62">
+  <div class="q-header">
+    <span class="q-num">Q62</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How can GitHub Copilot assist developers during the requirements analysis phase of the Software Development Life Cycle (SDLC)?</p>
+  <div class="choices">
+        <label class="opt" id="opt-62-A">
+          <input type="radio" name="q62" value="A" />
+          <span>A. By automatically generating detailed requirements documents.</span>
+        </label>
+        <label class="opt" id="opt-62-B">
+          <input type="radio" name="q62" value="B" />
+          <span>B. By providing templates and code snippets that help in documenting requirements.</span>
+        </label>
+        <label class="opt" id="opt-62-C">
+          <input type="radio" name="q62" value="C" />
+          <span>C. By identifying and fixing potential requirement conflicts when using /help.</span>
+        </label>
+        <label class="opt" id="opt-62-D">
+          <input type="radio" name="q62" value="D" />
+          <span>D. By managing stakeholder communication and meetings.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(62, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(62, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(62)">Reset</button>
+  </div>
+  <div class="q-result" id="result-62"></div>
+</div>
+
+<div class="q" id="q63">
+  <div class="q-header">
+    <span class="q-num">Q63</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What are the effects of content exclusions?</p>
+  <div class="choices">
+        <label class="opt" id="opt-63-A">
+          <input type="checkbox" name="q63" value="A" />
+          <span>A. The excluded content is not directly available to GitHub Copilot to use a context.</span>
+        </label>
+        <label class="opt" id="opt-63-B">
+          <input type="checkbox" name="q63" value="B" />
+          <span>B. GitHub Copilot suggestions are no longer available in the excluded files.</span>
+        </label>
+        <label class="opt" id="opt-63-C">
+          <input type="checkbox" name="q63" value="C" />
+          <span>C. The excluded content is no longer used while debugging the code.</span>
+        </label>
+        <label class="opt" id="opt-63-D">
+          <input type="checkbox" name="q63" value="D" />
+          <span>D. The IDE will not count coding suggestions in the excluded content.</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(63, ['A', 'B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(63, ['A', 'B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(63)">Reset</button>
+  </div>
+  <div class="q-result" id="result-63"></div>
+</div>
+
+<div class="q" id="q64">
+  <div class="q-header">
+    <span class="q-num">Q64</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">What is one way to reduce GitHub Copilot's relevance in a specific project?</p>
+  <div class="choices">
+        <label class="opt" id="opt-64-A">
+          <input type="radio" name="q64" value="A" />
+          <span>A. Use keyboard shortcuts to disable suggestions</span>
+        </label>
+        <label class="opt" id="opt-64-B">
+          <input type="radio" name="q64" value="B" />
+          <span>B. Create a .copilot-ignore file to exclude specific files or directories</span>
+        </label>
+        <label class="opt" id="opt-64-C">
+          <input type="radio" name="q64" value="C" />
+          <span>C. Delete the .gitignore file</span>
+        </label>
+        <label class="opt" id="opt-64-D">
+          <input type="radio" name="q64" value="D" />
+          <span>D. Set the repository to public</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(64, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(64, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(64)">Reset</button>
+  </div>
+  <div class="q-result" id="result-64"></div>
+</div>
+
+<div class="q" id="q65">
+  <div class="q-header">
+    <span class="q-num">Q65</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">Which GitHub Copilot plan allows for prompt and suggestion collection?</p>
+  <div class="choices">
+        <label class="opt" id="opt-65-A">
+          <input type="radio" name="q65" value="A" />
+          <span>A. GitHub Copilot Individuals</span>
+        </label>
+        <label class="opt" id="opt-65-B">
+          <input type="radio" name="q65" value="B" />
+          <span>B. GitHub Copilot Business</span>
+        </label>
+        <label class="opt" id="opt-65-C">
+          <input type="radio" name="q65" value="C" />
+          <span>C. GitHub Copilot Enterprise</span>
+        </label>
+        <label class="opt" id="opt-65-D">
+          <input type="radio" name="q65" value="D" />
+          <span>D. GitHub Copilot Codespace</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(65, ['C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(65, ['C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(65)">Reset</button>
+  </div>
+  <div class="q-result" id="result-65"></div>
+</div>
+
+<div class="q" id="q66">
+  <div class="q-header">
+    <span class="q-num">Q66</span><span class="badge badge-single">Single choice</span>
+  </div>
+  <p class="q-title">How can you get multiple suggestions from GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-66-A">
+          <input type="radio" name="q66" value="A" />
+          <span>A. By asking for multiple suggestions using comments in your code</span>
+        </label>
+        <label class="opt" id="opt-66-B">
+          <input type="radio" name="q66" value="B" />
+          <span>B. By opening the completions panel in your editor</span>
+        </label>
+        <label class="opt" id="opt-66-C">
+          <input type="radio" name="q66" value="C" />
+          <span>C. By using the inline chat functionality with the command /multiple</span>
+        </label>
+        <label class="opt" id="opt-66-D">
+          <input type="radio" name="q66" value="D" />
+          <span>D. By using @workspace in the chat window</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(66, ['B'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(66, ['B'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(66)">Reset</button>
+  </div>
+  <div class="q-result" id="result-66"></div>
+</div>
+
+<div class="q" id="q67">
+  <div class="q-header">
+    <span class="q-num">Q67</span><span class="badge badge-multi">Multiple choice</span>
+  </div>
+  <p class="q-title">What are two techniques to improve prompts to GitHub Copilot?</p>
+  <div class="choices">
+        <label class="opt" id="opt-67-A">
+          <input type="checkbox" name="q67" value="A" />
+          <span>A. Provide specific success criteria</span>
+        </label>
+        <label class="opt" id="opt-67-B">
+          <input type="checkbox" name="q67" value="B" />
+          <span>B. Provide all information about the utilized files</span>
+        </label>
+        <label class="opt" id="opt-67-C">
+          <input type="checkbox" name="q67" value="C" />
+          <span>C. Provide insight on where to get the content from to get a response</span>
+        </label>
+        <label class="opt" id="opt-67-D">
+          <input type="checkbox" name="q67" value="D" />
+          <span>D. Provide links to supporting documentation</span>
+        </label>
+  </div>
+  <div class="q-actions">
+    <button class="btn-check" onclick="checkAnswer(67, ['A', 'C'])">Check</button>
+    <button class="btn-reveal" onclick="revealAnswer(67, ['A', 'C'])">Show answer</button>
+    <button class="btn-reset" onclick="resetQuestion(67)">Reset</button>
+  </div>
+  <div class="q-result" id="result-67"></div>
+</div>
+
+</div>
+
+<script>
+const state = {};  // qnum -> 'correct'|'wrong'|'partial'|null
+
+function updateScoreboard() {
+  const answered = Object.keys(state).length;
+  const correct = Object.values(state).filter(v => v === 'correct').length;
+  const wrong = Object.values(state).filter(v => v !== 'correct').length;
+  document.getElementById('sc-answered').textContent = answered;
+  document.getElementById('sc-correct').textContent = correct;
+  document.getElementById('sc-wrong').textContent = wrong;
+  const pct = answered > 0 ? Math.round(correct / answered * 100) : null;
+  document.getElementById('sc-pct').textContent = pct !== null ? pct + '%' : '—';
+  document.getElementById('progress-fill').style.width = (answered / 67 * 100) + '%';
+  document.getElementById('progress-text').textContent = answered + ' / 67 câu đã trả lời';
+}
+
+function getSelected(qnum) {
+  return Array.from(document.querySelectorAll('input[name="q' + qnum + '"]:checked')).map(i => i.value);
+}
+
+function markOptions(qnum, correct) {
+  document.querySelectorAll('.q#q' + qnum + ' .opt').forEach(opt => {
+    opt.classList.remove('correct', 'wrong', 'missed');
+    const inp = opt.querySelector('input');
+    if (!inp) return;
+    const v = inp.value;
+    if (correct.includes(v) && inp.checked) opt.classList.add('correct');
+    else if (!correct.includes(v) && inp.checked) opt.classList.add('wrong');
+    else if (correct.includes(v) && !inp.checked) opt.classList.add('missed');
+  });
+}
+
+function setDisabled(qnum, disabled) {
+  document.querySelectorAll('input[name="q' + qnum + '"]').forEach(i => i.disabled = disabled);
+}
+
+function checkAnswer(qnum, correct) {
+  const selected = getSelected(qnum);
+  const resultEl = document.getElementById('result-' + qnum);
+  const card = document.getElementById('q' + qnum);
+
+  if (selected.length === 0) {
+    resultEl.textContent = 'Vui lòng chọn đáp án!';
+    resultEl.className = 'q-result info';
+    return;
+  }
+
+  const setEq = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+  const isCorrect = setEq(selected.sort(), correct.sort());
+
+  markOptions(qnum, correct);
+  setDisabled(qnum, true);
+
+  if (isCorrect) {
+    resultEl.textContent = '✓ Chính xác!';
+    resultEl.className = 'q-result ok';
+    card.className = card.className.replace(/answered-\S+/g, '') + ' answered-correct';
+    state[qnum] = 'correct';
+  } else {
+    const hasAnyCorrect = selected.some(v => correct.includes(v));
+    resultEl.textContent = '✗ Chưa đúng. Đáp án đúng: ' + correct.join(', ');
+    resultEl.className = 'q-result bad';
+    card.className = card.className.replace(/answered-\S+/g, '') + ' answered-wrong';
+    state[qnum] = 'wrong';
+  }
+
+  updateScoreboard();
+}
+
+function revealAnswer(qnum, correct) {
+  const resultEl = document.getElementById('result-' + qnum);
+  markOptions(qnum, correct);
+  setDisabled(qnum, true);
+  resultEl.innerHTML = '💡 Đáp án đúng: <strong>' + correct.join(', ') + '</strong>';
+  resultEl.className = 'q-result info';
+  if (!state[qnum]) {
+    state[qnum] = 'revealed';
+    updateScoreboard();
+  }
+}
+
+function resetQuestion(qnum) {
+  const card = document.getElementById('q' + qnum);
+  document.querySelectorAll('input[name="q' + qnum + '"]').forEach(i => { i.checked = false; i.disabled = false; });
+  document.querySelectorAll('.q#q' + qnum + ' .opt').forEach(opt => opt.classList.remove('correct', 'wrong', 'missed'));
+  const resultEl = document.getElementById('result-' + qnum);
+  resultEl.textContent = '';
+  resultEl.className = 'q-result';
+  card.className = card.className.replace(/\s*answered-\S+/g, '');
+  delete state[qnum];
+  updateScoreboard();
+}
+
+function filterQuestions(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.q').forEach(card => {
+    const qnum = parseInt(card.id.replace('q', ''));
+    card.classList.remove('hidden');
+    if (type === 'unanswered' && state[qnum]) card.classList.add('hidden');
+    else if (type === 'correct' && state[qnum] !== 'correct') card.classList.add('hidden');
+    else if (type === 'wrong' && (state[qnum] === 'correct' || !state[qnum])) card.classList.add('hidden');
+  });
+}
+
+updateScoreboard();
+</script>
+</body>
+</html>
+
