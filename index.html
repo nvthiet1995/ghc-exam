@@ -117,6 +117,13 @@
   .answer-reveal { display:none; background:#f0fdf4; border:1px solid #6ee7b7; border-radius:8px; padding:.5rem .85rem; margin-top:.4rem; font-size:.9rem; color:#065f46; }
   .answer-reveal strong { color:#03787c; }
 
+  /* Pagination */
+  .pagination-bar { display:flex; gap:.3rem; margin-bottom:1.5rem; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .page-btn { background:#e0f2f1; color:#03787c; border:1px solid #99f6e4; border-radius:8px; padding:.35rem .65rem; cursor:pointer; font-size:.85rem; font-weight:600; min-width:2.5rem; }
+  .page-btn.active { background:#03787c; color:#fff; border-color:#03787c; }
+  .page-btn:hover { background:#0d9488; color:#fff; }
+  .page-info { font-size:.85rem; color:#666; margin: 0 .5rem; }
+
   /* Navigation */
   .nav-bar { display:flex; justify-content:space-between; margin-top:1.5rem; flex-wrap:wrap; gap:.5rem; }
   .nav-btn { background:#03787c; color:#fff; border:none; border-radius:8px; padding:.5rem 1.25rem; cursor:pointer; font-weight:700; }
@@ -165,6 +172,19 @@
     <button class="filter-btn" onclick="filterQuestions('unanswered', this)">Chưa trả lời</button>
     <button class="filter-btn" onclick="filterQuestions('correct', this)">Đúng ✓</button>
     <button class="filter-btn" onclick="filterQuestions('wrong', this)">Sai ✗</button>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-bar" id="pagination">
+    <button class="page-btn active" onclick="showAllQuestions()">All</button>
+    <button class="page-btn active" onclick="goToPage(1)">1</button>
+    <button class="page-btn" onclick="goToPage(2)">2</button>
+    <button class="page-btn" onclick="goToPage(3)">3</button>
+    <button class="page-btn" onclick="goToPage(4)">4</button>
+    <button class="page-btn" onclick="goToPage(5)">5</button>
+    <button class="page-btn" onclick="goToPage(6)">6</button>
+    <button class="page-btn" onclick="goToPage(7)">7</button>
+    <span class="page-info" id="page-info">(Page 1 of 7 - Questions 1-10)</span>
   </div>
 
 <div class="q" id="q1">
@@ -2370,16 +2390,93 @@ function resetQuestion(qnum) {
 function filterQuestions(type, btn) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+ 
   document.querySelectorAll('.q').forEach(card => {
     const qnum = parseInt(card.id.replace('q', ''));
-    card.classList.remove('hidden');
-    if (type === 'unanswered' && state[qnum]) card.classList.add('hidden');
-    else if (type === 'correct' && state[qnum] !== 'correct') card.classList.add('hidden');
-    else if (type === 'wrong' && (state[qnum] === 'correct' || !state[qnum])) card.classList.add('hidden');
+    let shouldHideByFilter = false;
+   
+    if (type === 'unanswered' && state[qnum]) shouldHideByFilter = true;
+    else if (type === 'correct' && state[qnum] !== 'correct') shouldHideByFilter = true;
+    else if (type === 'wrong' && (state[qnum] === 'correct' || !state[qnum])) shouldHideByFilter = true;
+   
+    card.dataset.filterHidden = shouldHideByFilter ? 'true' : 'false';
   });
+ 
+  goToPage(1);
 }
 
+function showAllQuestions() {
+  // Show all questions
+  for (let i = 1; i <= 67; i++) {
+    const card = document.getElementById('q' + i);
+    if (card && card.dataset.filterHidden !== 'true') {
+      card.classList.remove('hidden');
+    } else if (card) {
+      card.classList.add('hidden');
+    }
+  }
+  
+  // Update pagination button states
+  document.querySelectorAll('.page-btn').forEach((btn, idx) => {
+    btn.classList.toggle('active', idx === 0); // "All" button is first (index 0)
+  });
+
+  // Update page info
+  document.getElementById('page-info').textContent = `(All 67 questions)`;
+
+  // Scroll to top of questions
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+ 
+function goToPage(pageNum) {
+  const questionsPerPage = 10;
+  const totalPages = 7;
+ 
+  if (pageNum < 1 || pageNum > totalPages) return;
+ 
+  const startQ = (pageNum - 1) * questionsPerPage + 1;
+  const endQ = Math.min(pageNum * questionsPerPage, 67);
+ 
+  // Apply both pagination and filter visibility
+  for (let i = 1; i <= 67; i++) {
+    const card = document.getElementById('q' + i);
+    if (card) {
+      const inPageRange = i >= startQ && i <= endQ;
+      const isFilteredOut = card.dataset.filterHidden === 'true';
+     
+      if (inPageRange && !isFilteredOut) {
+        card.classList.remove('hidden');
+      } else {
+        card.classList.add('hidden');
+      }
+    }
+  }
+ 
+  // Update pagination button states
+  document.querySelectorAll('.page-btn').forEach((btn, idx) => {
+    const btnPage = idx; // "All" button is index 0, page 1 is index 1, etc.
+    btn.classList.toggle('active', btnPage === pageNum);
+  });
+ 
+  // Update page info
+  document.getElementById('page-info').textContent = `(Page ${pageNum} of 7 - Questions ${startQ}-${endQ})`;
+ 
+  // Scroll to top of questions
+  // const firstQuestion = document.getElementById('q' + startQ);
+  // if (firstQuestion) {
+  //   firstQuestion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // }
+}
+ 
 updateScoreboard();
+ 
+// Initialize filter state for all questions
+document.querySelectorAll('.q').forEach(card => {
+  card.dataset.filterHidden = 'false';
+});
+ 
+goToPage(1);
+
 </script>
 </body>
 </html>
